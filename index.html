@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sweet Lang's IDE</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --panel: #13161e;
+    --border: #1f2433;
+    --accent: #f7c948;
+    --accent2: #4ef0c0;
+    --accent3: #f75f8a;
+    --text: #e8eaf0;
+    --muted: #5a6080;
+    --code-bg: #0a0c11;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Fira Code',monospace;min-height:100vh;display:flex;flex-direction:column;}
+
+  header{
+    background:var(--panel);
+    border-bottom:2px solid var(--accent);
+    padding:14px 20px;
+    display:flex;align-items:center;justify-content:space-between;
+    flex-wrap:wrap;gap:10px;
+  }
+  header h1{font-family:'Syne',sans-serif;font-size:1.5rem;color:var(--accent);letter-spacing:2px;}
+  header span{font-size:.75rem;color:var(--muted);}
+
+  .tabs{display:flex;gap:0;border-bottom:2px solid var(--border);}
+  .tab{padding:10px 18px;cursor:pointer;font-size:.8rem;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:.2s;}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+  .main{display:flex;flex:1;flex-direction:column;}
+
+  .editor-area{display:flex;flex-direction:column;flex:1;}
+  textarea#codeInput{
+    flex:1;min-height:280px;
+    background:var(--code-bg);color:#a8d8a8;
+    border:none;border-bottom:2px solid var(--border);
+    padding:16px;font-family:'Fira Code',monospace;font-size:.82rem;
+    resize:vertical;outline:none;line-height:1.7;
+  }
+
+  .toolbar{
+    display:flex;gap:8px;padding:10px 14px;background:var(--panel);
+    border-bottom:2px solid var(--border);flex-wrap:wrap;align-items:center;
+  }
+  .btn{
+    padding:7px 16px;border:none;border-radius:6px;cursor:pointer;
+    font-family:'Fira Code',monospace;font-size:.78rem;font-weight:600;
+    transition:.15s;letter-spacing:.5px;
+  }
+  .btn-run{background:var(--accent);color:#0d0f14;}
+  .btn-run:hover{filter:brightness(1.1);}
+  .btn-clear{background:var(--border);color:var(--muted);}
+  .btn-clear:hover{color:var(--text);}
+  .btn-example{background:transparent;border:1px solid var(--accent2);color:var(--accent2);}
+  .btn-example:hover{background:var(--accent2);color:#0d0f14;}
+
+  .output-label{
+    padding:8px 14px;font-size:.72rem;color:var(--muted);
+    background:var(--panel);border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .output-label span.pill{
+    background:var(--accent3);color:#fff;border-radius:20px;
+    padding:2px 10px;font-size:.68rem;display:none;
+  }
+  .output-label span.pill.show{display:inline;}
+
+  #preview{
+    flex:1;min-height:300px;
+    position:relative;overflow:hidden;
+    background:#fff;
+  }
+  #previewFrame{width:100%;height:100%;border:none;min-height:300px;}
+
+  .errors{
+    background:#1a0a0e;border-top:2px solid var(--accent3);
+    padding:10px 14px;font-size:.75rem;color:var(--accent3);
+    display:none;max-height:120px;overflow-y:auto;
+  }
+  .errors.show{display:block;}
+
+  /* Docs panel */
+  #docsPanel{display:none;padding:16px;overflow-y:auto;max-height:500px;}
+  #docsPanel.show{display:block;}
+  #docsPanel h2{color:var(--accent);font-family:'Syne',sans-serif;margin-bottom:12px;}
+  #docsPanel h3{color:var(--accent2);margin:14px 0 6px;font-size:.85rem;}
+  #docsPanel p,#docsPanel li{font-size:.78rem;color:#a0a8c0;line-height:1.7;}
+  #docsPanel code{background:var(--code-bg);padding:2px 6px;border-radius:4px;color:var(--accent);}
+  #docsPanel ul{margin-left:16px;}
+
+  .lang-ref{background:var(--code-bg);padding:12px;border-radius:8px;margin-top:8px;font-size:.75rem;line-height:1.9;color:#8af0c0;}
+
+  @media(min-width:700px){
+    .main{flex-direction:row;}
+    .editor-area{width:50%;border-right:2px solid var(--border);}
+    #preview{min-height:unset;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🍬 Sweet Lang's IDE</h1>
+  <span>Write Sweet Lang's → See your web app live</span>
+</header>
+
+<div style="background:var(--panel);">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('editor')">Editor</div>
+    <div class="tab" onclick="switchTab('docs')">Docs</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="editor-area">
+    <div class="toolbar">
+      <button class="btn btn-run" onclick="runCode()">▶ Run</button>
+      <button class="btn btn-clear" onclick="clearCode()">✕ Clear</button>
+      <button class="btn btn-example" onclick="loadExample()">Load Example</button>
+    </div>
+    <textarea id="codeInput" spellcheck="false" placeholder="Write your Sweet Lang's code here..."></textarea>
+    <div class="errors" id="errorBox"></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;flex:1;">
+    <div class="output-label">
+      <span>🖥 Live Preview</span>
+      <span class="pill" id="statusPill">Built!</span>
+    </div>
+    <div id="preview">
+      <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+    <div id="docsPanel">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────
+//  SWEET LANG'S INTERPRETER
+// ─────────────────────────────────────────
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active', (i===0&&tab==='editor')||(i===1&&tab==='docs'));
+  });
+  document.getElementById('docsPanel').classList.toggle('show', tab==='docs');
+  if(tab==='docs') buildDocs();
+}
+
+function buildDocs(){
+  const d = document.getElementById('docsPanel');
+  d.innerHTML = `
+  <h2>Sweet Lang's Reference</h2>
+  <p>Sweet Lang's is a simple language for building web app UIs with plain English-like syntax.</p>
+
+  <h3>File Header</h3>
+  <div class="lang-ref">Properties.Lays</div>
+
+  <h3>Components (Build:)</h3>
+  <ul>
+    <li><code>Build: [Label]</code> — Text display</li>
+    <li><code>Build: [Button]</code> — Clickable button</li>
+    <li><code>Build: [Background]</code> — Page background</li>
+    <li><code>Build: [hints]</code> — Footer hint text</li>
+    <li><code>Build: [Input]</code> — Text input field</li>
+    <li><code>Build: [Image]</code> — Image element</li>
+    <li><code>Build: [Card]</code> — Container card</li>
+    <li><code>Build: [Alert]</code> — Alert popup trigger</li>
+  </ul>
+
+  <h3>Common Properties</h3>
+  <ul>
+    <li><code>• Label: (text)</code> — Content / text</li>
+    <li><code>• Button text: (text)</code></li>
+    <li><code>• Position: (top center | top left | top right | center | bottom center | bottom left | bottom right)</code></li>
+    <li><code>• Text colour: (any CSS color or name)</code></li>
+    <li><code>• Background colour: (color)</code></li>
+    <li><code>• Colour: (color)</code> — for Background component</li>
+    <li><code>• Text size: (%)</code></li>
+    <li><code>• Button size: (%)</code></li>
+    <li><code>• Style: (Normal | Rounded | Pill | Bold | Italic | Shadow)</code></li>
+    <li><code>• Shadows: (Yes | No)</code></li>
+    <li><code>• Source: (url)</code> — for Image</li>
+    <li><code>• Width: (px or %)</code></li>
+    <li><code>• Height: (px or %)</code></li>
+    <li><code>• Id: (myId)</code> — gives element an ID for actions</li>
+    <li><code>• Placeholder: (text)</code> — for Input</li>
+    <li><code>• Border: (Yes | No)</code></li>
+  </ul>
+
+  <h3>Content Text</h3>
+  <div class="lang-ref">&lt;Your text here&gt;</div>
+  <p>Wrap text in angle brackets for Label or hints content.</p>
+
+  <h3>Button Actions (When Clicked)</h3>
+  <div class="lang-ref">
+When clicked: [ButtonId]<br>
+• Do: (show alert | hide | show | toggle | navigate | change colour | change text | change background)<br>
+• Target: (elementId)<br>
+• Message: (alert text)<br>
+• Value: (any value)<br>
+• Url: (https://...)
+  </div>
+
+  <h3>If / Then Logic</h3>
+  <div class="lang-ref">
+If: (inputId is empty)<br>
+• Then do: (show alert)<br>
+• Message: (Please fill input!)<br>
+• Trigger: (buttonId)
+  </div>
+  <p>Conditions: <code>is empty</code>, <code>is not empty</code>, <code>equals (value)</code>, <code>contains (value)</code></p>
+  <p>Then do actions: <code>show alert</code>, <code>show</code>, <code>hide</code>, <code>change text</code>, <code>change colour</code></p>
+  `;
+}
+
+// ─── PARSER ───────────────────────────────
+function parseSweetLang(code){
+  const lines = code.split('\n').map(l=>l.trim()).filter(l=>l && l!=='Properties.Lays');
+  const components = [];
+  const actions = [];
+  const ifthens = [];
+  let current = null;
+  let mode = null; // 'build' | 'when' | 'if'
+
+  for(let i=0;i<lines.length;i++){
+    const line = lines[i];
+
+    // Detect block type
+    if(/^Build:\s*\[(.+)\]/i.test(line)){
+      const type = line.match(/^Build:\s*\[(.+)\]/i)[1].trim();
+      current = {type, props:{}, content:''};
+      components.push(current);
+      mode='build';
+      continue;
+    }
+    if(/^When clicked:\s*\[(.+)\]/i.test(line)){
+      const id = line.match(/^When clicked:\s*\[(.+)\]/i)[1].trim();
+      current = {triggerId:id, props:{}};
+      actions.push(current);
+      mode='when';
+      continue;
+    }
+    if(/^If:\s*\((.+)\)/i.test(line)){
+      const cond = line.match(/^If:\s*\((.+)\)/i)[1].trim();
+      current = {condition:cond, props:{}};
+      ifthens.push(current);
+      mode='if';
+      continue;
+    }
+
+    // Content line <text>
+    if(/^<(.+)>$/.test(line)){
+      if(current && mode==='build') current.content = line.slice(1,-1);
+      continue;
+    }
+
+    // Property line
+    if(/^•\s*(.+?):\s*\((.+)\)$/.test(line)){
+      const m = line.match(/^•\s*(.+?):\s*\((.+)\)$/);
+      const key = m[1].trim().toLowerCase().replace(/\s+/g,'_');
+      const val = m[2].trim();
+      if(current) current.props[key] = val;
+      continue;
+    }
+  }
+  return {components, actions, ifthens};
+}
+
+// ─── CODE GENERATOR ───────────────────────
+function generateHTML(parsed, rawCode){
+  const {components, actions, ifthens} = parsed;
+
+  let bgColor = '#ffffff';
+  let bodyStyle = '';
+  const elements = [];
+  let idCounter = 0;
+
+  function autoId(comp){
+    if(!comp.props.id){
+      comp.props.id = 'el_'+(++idCounter);
+    }
+    return comp.props.id;
+  }
+
+  function positionCSS(pos='center'){
+    const p = pos.toLowerCase().trim();
+    const base = 'position:absolute;';
+    const map = {
+      'top center':'top:5%;left:50%;transform:translateX(-50%);',
+      'top left':'top:5%;left:5%;',
+      'top right':'top:5%;right:5%;',
+      'center':'top:50%;left:50%;transform:translate(-50%,-50%);',
+      'bottom center':'bottom:5%;left:50%;transform:translateX(-50%);',
+      'bottom left':'bottom:5%;left:5%;',
+      'bottom right':'bottom:5%;right:5%;',
+      'middle':'top:50%;left:50%;transform:translate(-50%,-50%);',
+    };
+    return base + (map[p] || map['center']);
+  }
+
+  function colorVal(c){ return c||'inherit'; }
+
+  function shadowCSS(s){ return (s||'').toLowerCase()==='yes'?'box-shadow:0 4px 18px rgba(0,0,0,.25);text-shadow:0 2px 8px rgba(0,0,0,.3);':''; }
+
+  function styleCSS(style, tag){
+    const s=(style||'').toLowerCase();
+    let r='';
+    if(s==='rounded') r+='border-radius:12px;';
+    if(s==='pill') r+='border-radius:50px;';
+    if(s==='bold') r+='font-weight:bold;';
+    if(s==='italic') r+='font-style:italic;';
+    return r;
+  }
+
+  // Process components
+  for(const comp of components){
+    const type = comp.type.toLowerCase();
+    const p = comp.props;
+    const id = autoId(comp);
+
+    if(type==='background'){
+      bgColor = p.colour || p.color || '#ffffff';
+      continue;
+    }
+
+    if(type==='label'){
+      const text = p.label || comp.content || 'Label';
+      const size = p.text_size ? `font-size:${p.text_size};` : 'font-size:1.2rem;';
+      const color = `color:${colorVal(p.text_colour||p.text_color)};`;
+      const pos = positionCSS(p.position);
+      const shadow = shadowCSS(p.shadows);
+      const sty = styleCSS(p.style);
+      elements.push(`<div id="${id}" style="${pos}${size}${color}${shadow}${sty}padding:8px;text-align:center;">${text}</div>`);
+      continue;
+    }
+
+    if(type==='button'){
+      const text = p.button_text || p.label || 'Button';
+      const size = p.button_size ? `width:${p.button_size};` : 'width:auto;';
+      const tsize = p.text_size ? `font-size:${p.text_size};` : 'font-size:1rem;';
+      const color = `color:${colorVal(p.text_colour||p.text_color)};`;
+      const bg = p.background_colour ? `background:${p.background_colour};` : 'background:#4a90e2;';
+      const pos = positionCSS(p.position);
+      const shadow = shadowCSS(p.shadows);
+      const sty = styleCSS(p.style);
+      const border = p.border==='No'?'border:none;':'border:none;';
+      elements.push(`<button id="${id}" style="${pos}${size}${tsize}${color}${bg}${shadow}${sty}${border}padding:10px 22px;cursor:pointer;font-family:inherit;" onclick="handleClick('${id}')">${text}</button>`);
+      continue;
+    }
+
+    if(type==='hints'){
+      const text = p.label || comp.content || '';
+      const size = p.text_size ? `font-size:${p.text_size};` : 'font-size:0.75rem;';
+      const color = `color:${colorVal(p.text_colour||p.text_color||'gray')};`;
+      const pos = positionCSS(p.position||'bottom center');
+      const sty = styleCSS(p.style);
+      elements.push(`<div id="${id}" style="${pos}${size}${color}${sty}text-align:center;padding:6px 12px;">${text}</div>`);
+      continue;
+    }
+
+    if(type==='input'){
+      const ph = p.placeholder || 'Type here...';
+      const size = p.text_size ? `font-size:${p.text_size};` : 'font-size:1rem;';
+      const pos = positionCSS(p.position);
+      const color = `color:${colorVal(p.text_colour||p.text_color||'#333')};`;
+      const w = p.width||'80%';
+      elements.push(`<input id="${id}" placeholder="${ph}" style="${pos}${size}${color}width:${w};padding:10px 14px;border:2px solid #ccc;border-radius:8px;outline:none;font-family:inherit;" />`);
+      continue;
+    }
+
+    if(type==='image'){
+      const src = p.source || p.src || '';
+      const w = p.width||'200px';
+      const h = p.height||'auto';
+      const pos = positionCSS(p.position);
+      const sty = styleCSS(p.style);
+      const shadow = shadowCSS(p.shadows);
+      elements.push(`<img id="${id}" src="${src}" style="${pos}width:${w};height:${h};${sty}${shadow}object-fit:cover;border-radius:8px;" alt="image"/>`);
+      continue;
+    }
+
+    if(type==='card'){
+      const text = p.label || comp.content || '';
+      const pos = positionCSS(p.position);
+      const bg = p.background_colour ? `background:${p.background_colour};` : 'background:#fff;';
+      const color = `color:${colorVal(p.text_colour||p.text_color||'#222')};`;
+      const w = p.width||'280px';
+      const shadow = shadowCSS('yes');
+      const sty = styleCSS(p.style);
+      elements.push(`<div id="${id}" style="${pos}${bg}${color}${shadow}${sty}width:${w};padding:20px 24px;border-radius:14px;">${text}</div>`);
+      continue;
+    }
+
+    if(type==='alert'){
+      // Alert is triggered by button, stored as special element
+      comp._isAlert = true;
+      continue;
+    }
+  }
+
+  // Build action JS
+  const actionMap = {};
+  for(const a of actions){
+    const tid = a.triggerId;
+    const p = a.props;
+    const doAction = (p.do||'').toLowerCase().trim();
+    const target = p.target||'';
+    const msg = p.message||'';
+    const val = p.value||'';
+    const url = p.url||'';
+
+    let js = '';
+    if(doAction==='show alert') js = `alert('${msg||'Hello!'}');`;
+    else if(doAction==='hide') js = `var t=document.getElementById('${target}');if(t)t.style.display='none';`;
+    else if(doAction==='show') js = `var t=document.getElementById('${target}');if(t)t.style.display='';`;
+    else if(doAction==='toggle') js = `var t=document.getElementById('${target}');if(t)t.style.display=t.style.display==='none'?'':'none';`;
+    else if(doAction==='navigate') js = `window.location.href='${url}';`;
+    else if(doAction==='change colour'||doAction==='change color') js = `var t=document.getElementById('${target}');if(t)t.style.color='${val}';`;
+    else if(doAction==='change background') js = `var t=document.getElementById('${target}');if(t)t.style.background='${val}';`;
+    else if(doAction==='change text') js = `var t=document.getElementById('${target}');if(t)t.innerText='${val}';`;
+
+    if(!actionMap[tid]) actionMap[tid] = [];
+    actionMap[tid].push(js);
+  }
+
+  // Build if/then JS (attached to trigger button)
+  const ifMap = {};
+  for(const ift of ifthens){
+    const cond = ift.condition;
+    const p = ift.props;
+    const then = (p.then_do||'').toLowerCase().trim();
+    const trigger = p.trigger||'';
+    const msg = p.message||'';
+    const target = p.target||'';
+    const val = p.value||'';
+
+    // Parse condition: "inputId is empty" / "inputId equals (val)" / "inputId contains (val)"
+    let condJS = 'false';
+    const condM = cond.match(/^(.+?)\s+(is empty|is not empty|equals\s+.+|contains\s+.+)$/i);
+    if(condM){
+      const elId = condM[1].trim();
+      const check = condM[2].trim().toLowerCase();
+      if(check==='is empty') condJS = `(function(){var e=document.getElementById('${elId}');return e&&e.value.trim()==='';}())`;
+      else if(check==='is not empty') condJS = `(function(){var e=document.getElementById('${elId}');return e&&e.value.trim()!=='';}())`;
+      else if(check.startsWith('equals')){
+        const ev = check.replace('equals','').trim().replace(/[()]/g,'');
+        condJS = `(function(){var e=document.getElementById('${elId}');return e&&e.value.trim()==='${ev}';}())`;
+      }
+      else if(check.startsWith('contains')){
+        const cv = check.replace('contains','').trim().replace(/[()]/g,'');
+        condJS = `(function(){var e=document.getElementById('${elId}');return e&&e.value.includes('${cv}');}())`;
+      }
+    }
+
+    let thenJS = '';
+    if(then==='show alert') thenJS = `alert('${msg}');`;
+    else if(then==='hide') thenJS = `var t=document.getElementById('${target}');if(t)t.style.display='none';`;
+    else if(then==='show') thenJS = `var t=document.getElementById('${target}');if(t)t.style.display='';`;
+    else if(then==='change text') thenJS = `var t=document.getElementById('${target}');if(t)t.innerText='${val}';`;
+    else if(then==='change colour'||then==='change color') thenJS = `var t=document.getElementById('${target}');if(t)t.style.color='${val}';`;
+
+    const ifJS = `if(${condJS}){${thenJS}return;}`;
+
+    if(trigger){
+      if(!ifMap[trigger]) ifMap[trigger] = [];
+      ifMap[trigger].push(ifJS);
+    }
+  }
+
+  // Merge into handleClick function
+  const allIds = new Set([...Object.keys(actionMap), ...Object.keys(ifMap)]);
+  let clickFn = 'function handleClick(id){\n';
+  for(const id of allIds){
+    clickFn += `if(id==='${id}'){\n`;
+    (ifMap[id]||[]).forEach(j=>{ clickFn += j+'\n'; });
+    (actionMap[id]||[]).forEach(j=>{ clickFn += j+'\n'; });
+    clickFn += '}\n';
+  }
+  clickFn += '}';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:${bgColor};
+    width:100%;min-height:100vh;
+    position:relative;overflow-x:hidden;
+    font-family:sans-serif;
+  }
+</style>
+</head>
+<body>
+${elements.join('\n')}
+<script>
+${clickFn}
+<\/script>
+</body>
+</html>`;
+}
+
+// ─── RUN ──────────────────────────────────
+function runCode(){
+  const code = document.getElementById('codeInput').value.trim();
+  const errBox = document.getElementById('errorBox');
+  const pill = document.getElementById('statusPill');
+
+  errBox.classList.remove('show');
+  errBox.textContent='';
+
+  if(!code){
+    errBox.textContent = '⚠ No code to run.';
+    errBox.classList.add('show');
+    return;
+  }
+
+  try{
+    const parsed = parseSweetLang(code);
+    const html = generateHTML(parsed, code);
+    const frame = document.getElementById('previewFrame');
+    frame.srcdoc = html;
+    pill.classList.add('show');
+    setTimeout(()=>pill.classList.remove('show'),2000);
+  } catch(e){
+    errBox.textContent = '⚠ Error: '+e.message;
+    errBox.classList.add('show');
+  }
+}
+
+function clearCode(){
+  document.getElementById('codeInput').value='';
+  document.getElementById('previewFrame').srcdoc='';
+  document.getElementById('errorBox').classList.remove('show');
+}
+
+function loadExample(){
+  document.getElementById('codeInput').value = `Properties.Lays
+
+
+Build: [Background]
+• Colour: (Purple)
+
+
+Build: [Label]
+• Label: (Hello World!)
+• Position: (Top Center)
+• Text colour: (White)
+• Style: (Bold)
+• Text size: (2rem)
+• Shadows: (Yes)
+
+
+Build: [Input]
+• Id: (nameInput)
+• Placeholder: (Enter your name...)
+• Position: (Center)
+• Width: (80%)
+
+
+Build: [Button]
+• Id: (greetBtn)
+• Button text: (Say Hello)
+• Position: (Bottom Center)
+• Text colour: (White)
+• Style: (Rounded)
+• Text size: (1rem)
+• Background colour: (#e44d7b)
+• Button size: (50%)
+• Shadows: (Yes)
+
+
+When clicked: [greetBtn]
+• Do: (show alert)
+• Message: (Hello there! Welcome to Sweet Lang's!)
+
+
+If: (nameInput is empty)
+• Then do: (show alert)
+• Message: (Please enter your name first!)
+• Trigger: (greetBtn)
+
+
+Build: [hints]
+<Made with Sweet Lang's by Henry Tallen>
+• Position: (Bottom Center)
+• Text size: (0.75rem)
+• Text colour: (rgba(255,255,255,0.6))
+• Style: (Normal)`;
+  runCode();
+}
+</script>
+</body>
+</html>
